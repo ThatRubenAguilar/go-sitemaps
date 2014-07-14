@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Error type to determine if parse failure was fatal (location)
@@ -71,7 +72,7 @@ type sitemap_url_entry struct {
 func (entry *sitemap_url_entry) parseSitemapURL() (sitemap_url *SitemapURL, err *urlParseError) {
 	sitemap_url = &SitemapURL{}
 	var temp_err error = nil
-	sitemap_url.location, temp_err = parseURL(entry.URL_raw)
+	sitemap_url.location, temp_err = ParseURL(entry.URL_raw)
 	if temp_err != nil && err == nil {
 		err = newUrlParseError(temp_err.Error(), true)
 	}
@@ -116,7 +117,7 @@ type sitemap_index_entry struct {
 func (entry *sitemap_index_entry) parseSitemapIndexURL() (sitemap_index_url *SitemapIndexURL, err *urlParseError) {
 	sitemap_index_url = &SitemapIndexURL{}
 	var temp_err error = nil
-	sitemap_index_url.location, temp_err = parseURL(entry.URL_raw)
+	sitemap_index_url.location, temp_err = ParseURL(entry.URL_raw)
 	if temp_err != nil && err == nil {
 		err = newUrlParseError(temp_err.Error(), true)
 	}
@@ -132,7 +133,7 @@ func (entry *sitemap_index_entry) parseSitemapIndexURL() (sitemap_index_url *Sit
 // parse validation functions
 var valid_urls = regexp.MustCompile(`^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][\t ])?$`)
 
-func parseURL(url_text string) (parsed_url string, err error) {
+func ParseURL(url_text string) (parsed_url string, err error) {
 	parsed_url, err = url.QueryUnescape(url_text)
 	if err != nil || !valid_urls.MatchString(url_text) {
 		if err == nil {
@@ -141,6 +142,29 @@ func parseURL(url_text string) (parsed_url string, err error) {
 		return "", err
 	}
 	return parsed_url, nil
+}
+
+// Appends append_text to url_text while maintaining one forward slash between the two.
+// Slashes in append_text are maintained
+func AppendURL(url_text string, append_text []string) (url string, err error) {
+	append_len := len(append_text)
+	if append_len <= 0 {
+		return url_text, nil
+	}
+	last_rune, width := utf8.DecodeLastRuneInString(url_text)
+	if last_rune == utf8.RuneError && width == 1 {
+		return "", errors.New(fmt.Sprintf("'%s' is not a valid utf8 string", url_text))
+	}
+	if append_len == 1 && last_rune == '/' {
+		url = url_text + append_text[0]
+		return url, nil
+
+	} else if append_len > 1 && last_rune == '/' {
+		url = strings.Join(append([]string{url_text + append_text[0]}, append_text[1:]...), "/")
+		return url, nil
+	}
+	url = strings.Join(append([]string{url_text}, append_text...), "/")
+	return url, nil
 }
 
 func parsePriority(priority_text string) (parsed_priority float32, err error) {

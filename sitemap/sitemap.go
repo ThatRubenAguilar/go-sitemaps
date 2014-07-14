@@ -21,6 +21,7 @@ import (
 	//	"net/url"
 	//	"strconv"
 	//	"strings"
+	"gocrawl/sitemap/netrule"
 	"gocrawl/util"
 	//"time"
 
@@ -198,6 +199,7 @@ func parseSitemapXml(xml_text string, err_stream chan *SitemapURL_Parse_Error) (
 type Sitemap struct {
 	sitemap_datastore datastore.DataStore
 
+	access_rule   netrule.NetAccessRule
 	sitemap_index *SitemapIndex
 	sitemap_page  *SitemapPage
 	err           error
@@ -252,53 +254,73 @@ func (sitemap *Sitemap) Next() (success bool) {
 	// got here due to sitemap_page == nil || (!success && sitemap_page.Err() == nil)
 	// lets try to grab next entry in sitemap_index
 	if sitemap.sitemap_index != nil {
-		for {
-			success = sitemap.sitemap_index.Next()
-			// End of index stream
-			if !success {
-				sitemap.err = sitemap.sitemap_index.Err()
-				sitemap.sitemap_page = nil
-				return success
-			} else { // Next entry
-				index_item := sitemap.sitemap_index.Item()
-				// rule for grabbing next has been met
-				if true {
-					response, err := http.Get(index_item.Location())
-					if err != nil {
-						sitemap.err = err
-						sitemap.sitemap_page = nil
-						return false
-					}
-					defer response.Body.Close()
-					sitemap.sitemap_page, err = NewSitemapPage(response.Body)
-					if err != nil {
-						sitemap.err = err
-						sitemap.sitemap_page = nil
-						return false
-					}
-				}
-				if sitemap.sitemap_page != nil {
-					success = sitemap.sitemap_page.Next()
-					if success || sitemap.sitemap_page.Err() != nil {
-						sitemap.err = sitemap.sitemap_page.Err()
-						return success
-					}
-				}
-			}
+		success = sitemap.NextPage()
+		if !success && sitemap.Err() != nil {
+			return false
 		}
 
+		if sitemap.sitemap_page != nil {
+			success = sitemap.sitemap_page.Next()
+			if success || sitemap.sitemap_page.Err() != nil {
+				sitemap.err = sitemap.sitemap_page.Err()
+				return success
+			}
+		}
 	}
 	return false
 
+}
+
+// Checks if the access_rule condition is met, blocks until it is met
+func canNetAccess(access_rule netrule.NetAccessRule) {
+	if access_rule != nil {
+		var access_chan = access_rule.AccessChannel()
+		if access_chan != nil {
+			for {
+				select {
+				case <-access_chan:
+					return
+				default:
+				}
+			}
+		}
+	}
 }
 
 // Grabs the next page in the index and sets sitemap_page to it, returns false on error or when the index is exhausted
 // False return value and nil Err() indicate end of stream.
 func (sitemap *Sitemap) NextPage() (success bool) {
 	if sitemap.sitemap_index != nil {
-		success = sitemap.sitemap_index.Next()
-		sitemap.err = sitemap.sitemap_index.Err()
-		return success
+		success := sitemap.sitemap_index.Next()
+		// End of index stream
+		if !success {
+			sitemap.err = sitemap.sitemap_index.Err()
+			sitemap.sitemap_page = nil
+			return false
+		} else { // Next entry
+			index_item := sitemap.sitemap_index.Item()
+			access_rule := sitemap.access_rule
+			// rule for grabbing next has been met
+			canNetAccess(access_rule)
+
+			response, err := http.Get(index_item.Location())
+			if err != nil {
+				sitemap.err = err
+				sitemap.sitemap_page = nil
+				return false
+			}
+			defer response.Body.Close()
+			sitemap.sitemap_page, err = NewSitemapPage(response.Body)
+			if err != nil {
+				sitemap.err = err
+				sitemap.sitemap_page = nil
+				return false
+			}
+			if access_rule != nil {
+				go access_rule.Accessed()
+			}
+			return true
+		}
 	}
 	sitemap.err = nil
 	return false

@@ -237,7 +237,7 @@ func (iterator *plainSitemapPageIterator) Next() (success bool) {
 		iterator.item = nil
 		return false
 	}
-	parsed_url, err := parseURL(iterator.sitemap_scanner.Text())
+	parsed_url, err := ParseURL(iterator.sitemap_scanner.Text())
 	if err != nil {
 		iterator.err = err
 		iterator.item = nil

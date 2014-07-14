@@ -19,19 +19,80 @@ func Benchmark_(b *testing.B) {
 }
 */
 
-func Test_parseURL_Normal(t *testing.T) {
+func Test_ParseURL_Normal(t *testing.T) {
 	expected := `http://www.venuecom.com?beef=stew&whee=phewü`
 	test_string := `http://www.venuecom.com?beef=stew&whee=phew%C3%BC`
-	parsed, err := parseURL(test_string)
-	assert.Nil(t, err, fmt.Sprintf("unexpected error from parseURL: %s", err))
+	parsed, err := ParseURL(test_string)
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from ParseURL: %s", err))
 	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
 }
 
-func Test_parseURL_BadValue(t *testing.T) {
+func Test_ParseURL_BadValue(t *testing.T) {
 	expected := ""
 	test_string := `www.venuecom.com?beef=stew&whee=phew%C3%BC`
-	parsed, err := parseURL(test_string)
-	assert.NotNil(t, err, fmt.Sprintf("unexpected nil error from parseURL on parsed item \"%s\"", test_string))
+	parsed, err := ParseURL(test_string)
+	assert.NotNil(t, err, fmt.Sprintf("unexpected nil error from ParseURL on parsed item \"%s\"", test_string))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_EmptyList(t *testing.T) {
+	expected := `www.venuecom.com`
+	test_string := `www.venuecom.com`
+	parsed, err := AppendURL(test_string, []string{})
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_NilList(t *testing.T) {
+	expected := `www.venuecom.com`
+	test_string := `www.venuecom.com`
+	parsed, err := AppendURL(test_string, nil)
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_NoSlash(t *testing.T) {
+	expected := `www.venuecom.com/end`
+	test_string := `www.venuecom.com`
+	test_append := `end`
+	parsed, err := AppendURL(test_string, []string{test_append})
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_Slash(t *testing.T) {
+	expected := `www.venuecom.com/end`
+	test_string := `www.venuecom.com/`
+	test_append := `end`
+	parsed, err := AppendURL(test_string, []string{test_append})
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_ExtraSlash(t *testing.T) {
+	expected := `www.venuecom.com//end`
+	test_string := `www.venuecom.com/`
+	test_append := `/end`
+	parsed, err := AppendURL(test_string, []string{test_append})
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_ExtraNoSlash(t *testing.T) {
+	expected := `www.venuecom.com//end`
+	test_string := `www.venuecom.com`
+	test_append := `/end`
+	parsed, err := AppendURL(test_string, []string{test_append})
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
+	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
+}
+
+func Test_AppendURL_Multiple(t *testing.T) {
+	expected := `www.venuecom.com/end/of/world`
+	test_string := `www.venuecom.com`
+	test_append := []string{`end`, `of`, `world`}
+	parsed, err := AppendURL(test_string, test_append)
+	assert.Nil(t, err, fmt.Sprintf("unexpected error from AppendURL: %s", err))
 	assert.Equal(t, parsed, expected, fmt.Sprintf("parsed item \"%s\" did not match expected \"%s\"", parsed, expected))
 }
 
